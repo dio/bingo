@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -410,6 +411,10 @@ func gomodcache() string {
 	if gpath := os.Getenv("GOPATH"); gpath != "" && cachepath == "" {
 		cachepath = filepath.Join(gpath, "pkg/mod")
 	}
+	if cachepath == "" {
+		cacheout, _ := exec.Command("go", "env", "GOMODCACHE").Output()
+		cachepath = strings.Trim(string(cacheout), "\n")
+	}
 	return cachepath
 }
 
@@ -463,6 +468,7 @@ func encodePath(path string) string {
 // resolveInGoModCache will try to find a referenced module in the Go modules cache.
 func resolveInGoModCache(logger *log.Logger, verbose bool, update runner.GetUpdatePolicy, target *bingo.Package) error {
 	modMetaCache := filepath.Join(gomodcache(), "cache/download")
+	logger.Printf("resolving %v in go mod cache %v\n", target, modMetaCache)
 	modulePath := target.Path()
 	// Case sensitivity problem is fixed by replacing upper case with '/!<lower case letter>` signature.
 	// See https://tip.golang.org/cmd/go/#hdr-Module_proxy_protocol
@@ -470,7 +476,7 @@ func resolveInGoModCache(logger *log.Logger, verbose bool, update runner.GetUpda
 
 	// Since we don't know which part of full path is package, which part is module.
 	// Start from longest and go until we find one.
-	for ; len(strings.Split(lookupModulePath, "/")) > 2; func() {
+	for ; len(strings.Split(lookupModulePath, "/")) > 1; func() {
 		lookupModulePath = filepath.Dir(lookupModulePath)
 		modulePath = filepath.Dir(modulePath)
 	}() {
